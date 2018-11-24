@@ -1,0 +1,14 @@
+# For Virtual Machine
+# DISK=/dev/sda
+# ESP_PARTITION=/dev/sda1
+# CRYPT_PARTITION=/dev/sda2
+# ROOT_SIZE=8G
+
+# For NUC
+DISK=/dev/nvme0n1
+ESP_PARTITION=/dev/nvme0n1p1
+CRYPT_PARTITION=/dev/nvme0n1p2
+ROOT_SIZE=64G
+
+# Common
+BOOT_SIZE=1G
