@@ -12,19 +12,18 @@ declare -r CONFIG_CRYPT_PARTITION=${CRYPT_PARTITION}
 
 main() {
 	printf "In chroot setup script\n"
-	# set_time_zone
-	# set_hardware_clock
-	# set_locale_info
-	# set_host_name
-	# setup_initramfs
-	# setup_login
-	# disable_root
-	# setup_systemd_boot
-	# enable_dhcp
-	# install_base_packages
+	set_time_zone
+	set_hardware_clock
+	set_locale_info
+	set_host_name
+	setup_initramfs
+	setup_login
+	disable_root
+	setup_systemd_boot
+	enable_dhcp
+	install_base_packages
 	install_sshd
-
-	# install_graphical_desktop
+	install_graphical_desktop
 }
 
 set_time_zone() {

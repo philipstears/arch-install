@@ -2,9 +2,9 @@
 set -euo pipefail
 
 main() {
-	# configure_package_manager
-	# install_base_system
-	# generate_fs_tab
+	configure_package_manager
+	install_base_system
+	generate_fs_tab
 	setup_system_inside_chroot
 }
 

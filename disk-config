@@ -8,7 +8,7 @@
 DISK=/dev/nvme0n1
 ESP_PARTITION=/dev/nvme0n1p1
 CRYPT_PARTITION=/dev/nvme0n1p2
-ROOT_SIZE=64G
+ROOT_SIZE=128GB
 
 # Common
 BOOT_SIZE=1G
