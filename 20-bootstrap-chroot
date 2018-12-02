@@ -6,223 +6,197 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 source disk-config
 source system-config
 
+# Import the config we need so that we crash early if it isn't there.
 declare -r CONFIG_HOST_NAME=${HOST_NAME}
 declare -r CONFIG_USER_NAME=${USER_NAME}
-declare -r CONFIG_CRYPT_PARTITION=${CRYPT_PARTITION}
+declare -r CONFIG_SSHD_PORT=${SSHD_PORT}
+declare -r CONFIG_GIT_USER_NAME=${GIT_USER_NAME}
+declare -r CONFIG_GIT_EMAIL=${GIT_EMAIL}
+declare -r CONFIG_POST_BOOTSTRAP_HOOK=${POST_BOOTSTRAP_HOOK:-}
 
 main() {
-	printf "In chroot setup script\n"
-	set_time_zone
-	set_hardware_clock
-	set_locale_info
-	set_host_name
-	setup_initramfs
-	setup_login
-	disable_root
-	setup_systemd_boot
-	enable_dhcp
-	install_base_packages
-	install_sshd
-	install_graphical_desktop
+    printf "In chroot setup script\n"
+    set_time_zone
+    set_hardware_clock
+    set_locale_info
+    configure_host
+    setup_initramfs
+    setup_login
+    disable_root
+    setup_systemd_boot
+    enable_dhcp
+    install_base_packages
+    configure_sshd
+    configure_git
+    install_graphical_desktop
+
+    if [[ -x "${CONFIG_POST_BOOTSTRAP_HOOK}" ]]; then
+        export CONFIG_HOST_NAME
+        export CONFIG_USER_NAME
+        "./${CONFIG_POST_BOOTSTRAP_HOOK}"
+    fi
 }
 
 set_time_zone() {
-	printf "Configuring time zone\n"
-	ln -sf "/usr/share/zoneinfo/${TZ_REGION}/${TZ_CITY}" /etc/localtime
+    printf "Configuring time zone\n"
+    ln -sf "/usr/share/zoneinfo/${TZ_REGION}/${TZ_CITY}" /etc/localtime
 }
 
 set_hardware_clock() {
-	printf "Setting hardware clock\n"
-	hwclock --systohc
+    printf "Setting hardware clock\n"
+    hwclock --systohc
 }
 
 set_locale_info() {
-	printf "Configuring locale information\n"
-	sed --in-place=.original 's/#\(en_US\|en_GB\|en_DK\|de_DE\|de_AT\)/\1/' /etc/locale.gen
-	locale-gen
+    printf "Configuring locale information\n"
+    sed --in-place=.original 's/#\(en_US\|en_GB\|en_DK\|de_DE\|de_AT\)/\1/' /etc/locale.gen
+    locale-gen
 
-	{
-		printf "LANG=en_DK.UTF-8\n"
-		printf "LANGUAGE=en_GB:en\n"
-	} > /etc/locale.conf
+    {
+        printf "LANG=en_DK.UTF-8\n"
+        printf "LANGUAGE=en_GB:en\n"
+    } > /etc/locale.conf
 
-	{
-		printf "\n"
-	} > /etc/vconsole.conf
+    {
+        printf "\n"
+    } > /etc/vconsole.conf
 }
 
-set_host_name() {
-	printf "Configuring host information\n"
-	printf "%s\n" "${CONFIG_HOST_NAME}" > /etc/hostname
+configure_host() {
+    printf "Configuring host information\n"
+    printf "%s\n" "${CONFIG_HOST_NAME}" > /etc/hostname
 
-	{
-		printf "# Local Entries\n"
-		printf "127.0.0.1\t\t\tlocalhost\n"
-		printf "127.0.1.1\t\t\t%s\n" "${CONFIG_HOST_NAME}"
-		printf "\n"
-		printf "# Local Entries (IPv6)\n"
-		printf ":1\t\tip6-localhost ip6-loopback\n"
-	} > /etc/hosts
+    {
+        printf "# Local Entries\n"
+        printf "127.0.0.1\t\t\tlocalhost\n"
+        printf "127.0.1.1\t\t\t%s\n" "${CONFIG_HOST_NAME}"
+        printf "\n"
+        printf "# Local Entries (IPv6)\n"
+        printf ":1\t\tip6-localhost ip6-loopback\n"
+    } > /etc/hosts
+
+    if [[ -f private/private-hosts ]]; then
+        cat private/private-hosts >> /etc/hosts
+    fi
 }
 
 setup_initramfs() {
-	printf "Setting up initcpio\n"
-	sed --in-place=.original 's/^HOOKS=.*$/HOOKS=(base systemd keyboard autodetect sd-vconsole modconf block sd-encrypt sd-lvm2 filesystems fsck)/' /etc/mkinitcpio.conf
-	mkinitcpio -p linux
+    printf "Setting up initcpio\n"
+    sed --in-place=.original 's/^HOOKS=.*$/HOOKS=(base systemd keyboard autodetect sd-vconsole modconf block sd-encrypt sd-lvm2 filesystems fsck)/' /etc/mkinitcpio.conf
+    mkinitcpio -p linux
 }
 
 setup_login() {
-	printf "Setting up new user called %s.\n"
+    printf "Setting up new user called %s.\n"
 
-	# NOTE: see https://wiki.archlinux.org/index.php/users_and_groups for group details
-	useradd --create-home --groups wheel,adm,log,rfkill,sys "${CONFIG_USER_NAME}"
-	passwd "${CONFIG_USER_NAME}"
-	{
-		printf '%%wheel ALL=(ALL) ALL\n'
-	} > /etc/sudoers.d/wheel
+    # NOTE: see https://wiki.archlinux.org/index.php/users_and_groups for group details
+    if ! getent passwd "${CONFIG_USER_NAME}" > /dev/null 2&>1; then
+        useradd --create-home --groups wheel,adm,log,rfkill,sys "${CONFIG_USER_NAME}"
+        passwd "${CONFIG_USER_NAME}"
+    fi
+
+    # Make sure it's in sudoers
+    {
+        printf '%%wheel ALL=(ALL) ALL\n'
+    } > /etc/sudoers.d/wheel
 }
 
 disable_root() {
-	printf "Disabling root.\n"
+    printf "Disabling root.\n"
 
-	# Remove roots password completely and lock the user
-	passwd -dl root
+    # Remove roots password completely and lock the user
+    passwd -dl root
 
-	# And set it's account expiry into the past
-	usermod --expiredate 1 root
+    # And set it's account expiry into the past
+    usermod --expiredate 1 root
 }
 
 setup_systemd_boot() {
-	local -r lvm_vg_name=main
-	local -r lvm_lv_name=root
-	local -r device_id=$(blkid /dev/nvme0n1p2 --match-tag=UUID --output=value)
+    local -r lvm_vg_name=main
+    local -r lvm_lv_name=root
+    local -r device_id=$(blkid /dev/nvme0n1p2 --match-tag=UUID --output=value)
 
-	# make sure we've got some microcode
-	pacman -S --noconfirm intel-ucode
+    # make sure we've got some microcode
+    pacman -S --noconfirm intel-ucode
 
-	# our ESP is always mounted to /boot
-	bootctl --path=/boot install
+    # our ESP is always mounted to /boot
+    bootctl --path=/boot install
 
-	{
-		printf "default arch\n"
-		printf "timeout 5\n"
-		printf "console-mode max\n"
-		printf "editor no\n"
-	} > /boot/loader/loader.conf
+    {
+        printf "default arch\n"
+        printf "timeout 5\n"
+        printf "console-mode max\n"
+        printf "editor no\n"
+    } > /boot/loader/loader.conf
 
-	{
-		printf "title   Arch Linux\n"
-		printf "linux   /vmlinuz-linux\n"
-		printf "initrd  /intel-ucode.img\n"
-		printf "initrd  /initramfs-linux.img\n"
-		printf "options rd.luks.name=%s=cryptlvm root=/dev/%s/%s\n" "${device_id}" "${lvm_vg_name}" "${lvm_lv_name}"
-	} > /boot/loader/entries/arch.conf
+    {
+        printf "title   Arch Linux\n"
+        printf "linux   /vmlinuz-linux\n"
+        printf "initrd  /intel-ucode.img\n"
+        printf "initrd  /initramfs-linux.img\n"
+        printf "options rd.luks.name=%s=cryptlvm root=/dev/%s/%s\n" "${device_id}" "${lvm_vg_name}" "${lvm_lv_name}"
+    } > /boot/loader/entries/arch.conf
 }
 
 enable_dhcp() {
-	printf "Enabling DHCP Client\n"
-	systemctl enable dhcpcd
-}
-
-install_graphical_desktop() {
-	local -a packages=()
-
-	printf "Installing graphical desktop\n"
-
-	packages+=(xorg)
-	packages+=(xorg-server)
-	packages+=(xorg-xinit)
-	packages+=(xorg-apps)
-	packages+=(xorg-drivers) # too much?
-	packages+=(xorg-fonts)
-	packages+=(mesa)
-	packages+=(mate)
-	packages+=(mate-extra)
-	packages+=(lightdm lightdm-gtk-greeter)
-	packages+=(pulseaudio pulseaudio-alsa pavucontrol)
-	packages+=(firefox)
-	packages+=(dmenu) 	# For xmonad
-	packages+=(clipmenu) 	# Seems a nice concept
-
-	pacman -S --noconfirm "${packages[@]}"
-
-	systemctl enable lightdm
+    printf "Enabling DHCP Client\n"
+    systemctl enable dhcpcd
 }
 
 install_base_packages() {
-	printf "Installing basic packages\n"
+    printf "Installing basic packages\n"
 
-	local -a base_packages=()
+    local -a base_packages=()
 
-	base_packages+=(base-devel)
-	base_packages+=(linux-tools) # perf
-	base_packages+=(git git-lfs vim)
+    base_packages+=(base-devel)
+    base_packages+=(linux-tools) # perf
+    base_packages+=(git git-lfs vim)
+    base_packages+=(openssh)
 
-	pacman -S --noconfirm "${base_packages[@]}"
+    pacman -S --noconfirm "${base_packages[@]}"
 }
 
-install_sshd() {
-	pacman -S --noconfirm openssh
+configure_sshd() {
+    local -r user_home_directory=$(getent passwd "${CONFIG_USER_NAME}" | cut -d: -f6)
+    local -r user_ssh_directory=${user_home_directory}/.ssh
 
+    if [[ -f private/id_rsa ]] && [[ -f private/id_rsa.pub ]]; then
+        mkdir -p "${user_ssh_directory}"
+        cp private/id_rsa "${user_ssh_directory}/"
+        cp private/id_rsa.pub "${user_ssh_directory}/"
+    fi
 
-	systemctl enable sshd
+    SSHD_PORT=${CONFIG_SSHD_PORT} envsubst < sshd_config-template > /etc/ssh/sshd_config
+
+    systemctl enable sshd
 }
 
-additional() {
-	local -a standard_packages=()
-
-	# These are also installed by our bootstrap script, but
-	# this script assumes only a minimal installation in case
-	# it's run atop something more basic
-	standard_packages+=(base-devel)
-	standard_packages+=(linux-tools) # perf
-	standard_packages+=(git git-lfs vim)
-
-	standard_packages+=(rsync)
-	standard_packages+=(terraform)
-	standard_packages+=(tmux)
-	standard_packages+=(ripgrep the_silver_searcher)
-	standard_packages+=(jq)
-	standard_packages+=(curl wget)
-	standard_packages+=(iftop iotop htop)
-	standard_packages+=(unzip)
-	standard_packages+=(strace)
-
-	standard_packages+=(docker)
-
-	standard_packages+=(audacity)
-	standard_packages+=(vlc)
-	standard_packages+=(obs-studio)
-
-	standard_packages+=(firefox-developer-edition)
-	standard_packages+=(chromium)
-
-	standard_packages+=(keepass)
-	standard_packages+=(xdotool)
-	standard_packages+=(xsel)
-
-	standard_packages+=(tcpdump)
-	standard_packages+=(wireshark-qt)
-
-	standard_packages+=(neovim)
-	standard_packages+=(ekiga)
-	standard_packages+=(electrum)
-	standard_packages+=(code)
-	standard_packages+=(gimp)
-	standard_packages+=(libreoffice)
-	standard_packages+=(steam steam-native-runtime)
-
-	standard_packages+=(bochs)
-
-	pacman -S --noconfirm "${standard_packages[@]}"
-	# virtualbox
-	# non pacman things:
-	#    chrome
-	#    emacs
-	#    skype (AUR - skypeforlinux-stable-bin)
-	#    spotify (AUR)
-	#    dropbox (AUR)
+configure_git() {
+    git config --global user.name "${CONFIG_GIT_USER_NAME}"
+    git config --global user.email "${CONFIG_GIT_EMAIL}"
 }
 
+install_graphical_desktop() {
+    local -a packages=()
+
+    printf "Installing graphical desktop\n"
+
+    packages+=(xorg)
+    packages+=(xorg-server)
+    packages+=(xorg-xinit)
+    packages+=(xorg-apps)
+    packages+=(xorg-drivers) # too much?
+    packages+=(xorg-fonts)
+    packages+=(mesa)
+    packages+=(mate)
+    packages+=(mate-extra)
+    packages+=(lightdm lightdm-gtk-greeter)
+    packages+=(pulseaudio pulseaudio-alsa pavucontrol)
+    packages+=(firefox)
+
+    pacman -S --noconfirm "${packages[@]}"
+
+    systemctl enable lightdm
+}
 
 main "${@}"

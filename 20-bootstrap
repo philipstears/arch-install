@@ -2,47 +2,57 @@
 set -euo pipefail
 
 main() {
-	configure_package_manager
-	install_base_system
-	generate_fs_tab
-	setup_system_inside_chroot
+    enable_ntp
+    configure_package_manager
+    install_base_system
+    generate_fs_tab
+    setup_system_inside_chroot
+}
+
+enable_ntp() {
+    timedatectl set-ntp true
 }
 
 configure_package_manager() {
-	printf "Configuring Package Manager\n"
+    printf "Configuring Package Manager\n"
 
-	# Stage 0 - Generate a Preliminary Mirror List
-	cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.original
-	curl -s "https://www.archlinux.org/mirrorlist/?country=AT&country=DE&protocol=https&use_mirror_status=on" | sed -e "s/^#Server/Server/" -e "/^#/d" > /etc/pacman.d/mirrorlist
+    # Stage 0 - Generate a Preliminary Mirror List
+    cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.original
+    curl -s "https://www.archlinux.org/mirrorlist/?country=AT&country=DE&protocol=https&use_mirror_status=on" | sed -e "s/^#Server/Server/" -e "/^#/d" > /etc/pacman.d/mirrorlist
 
-	# Stage 1 - With that done, we can synchronize the package lists and get the rankmirrors tool
-	pacman -Sy
-	pacman -S --noconfirm pacman-contrib
+    # Stage 1 - With that done, we can synchronize the package lists and get the rankmirrors tool
+    pacman -Sy
+    pacman -S --noconfirm pacman-contrib
 
-	# Stage 2 - Now we can rank the mirrors
-	cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.unranked
-	rankmirrors -n 6 /etc/pacman.d/mirrorlist.unranked > /etc/pacman.d/mirrorlist
+    # Stage 2 - Now we can rank the mirrors
+    cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.unranked
+    rankmirrors -n 6 /etc/pacman.d/mirrorlist.unranked > /etc/pacman.d/mirrorlist
 }
 
 install_base_system() {
-	printf "Running pacstrap to bootstrap system\n"
-	pacstrap /mnt base sudo
+    printf "Running pacstrap to bootstrap system\n"
+    pacstrap /mnt base sudo
 }
 
 generate_fs_tab() {
-	printf "Installing fstab\n"
-	genfstab -U /mnt >> /mnt/etc/fstab
+    printf "Installing fstab\n"
+    genfstab -U /mnt >> /mnt/etc/fstab
 }
 
 setup_system_inside_chroot() {
-	printf "Running setup tasks in chroot\n"
-	declare -r setup_dir=/mnt/tmp-setup
-	mkdir -p "${setup_dir}"
-	cp 20-bootstrap-chroot "${setup_dir}"
-	cp system-config "${setup_dir}"          # hostname/username/etc
-	cp disk-config "${setup_dir}"            # Needed so we can configure the bootloader properly
+    printf "Running setup tasks in chroot\n"
+    declare -r setup_dir=/mnt/tmp-setup
+    mkdir -p "${setup_dir}"
+    cp 20-bootstrap-chroot "${setup_dir}"
+    cp system-config "${setup_dir}"          # hostname/username/etc
+    cp disk-config "${setup_dir}"            # Needed so we can configure the bootloader properly
 
-	arch-chroot /mnt /tmp-setup/20-bootstrap-chroot
+    # Private hosts, SSH keys, etc
+    if [[ -d private ]]; then
+        cp -r private "${setup_dir}"
+    fi
+
+    arch-chroot /mnt /tmp-setup/20-bootstrap-chroot
 }
 
 main "${@}"

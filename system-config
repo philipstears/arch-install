@@ -2,4 +2,8 @@ TZ_REGION=Europe
 TZ_CITY=Vienna
 HOST_NAME=sthades
 USER_NAME=stears
+SSHD_PORT=8822
+GIT_USER_NAME="Philip Stears"
+GIT_EMAIL="philip@philipstears.com"
+POST_BOOTSTRAP_HOOK=hooks/stears-post-bootstrap-hook
 

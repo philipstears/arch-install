@@ -27,30 +27,30 @@ umount /mnt 2>/dev/null || true
 
 # Set-up for LUKS + LVM
 {
-	printf "g\n" # GPT
-	printf "w\n" # Done - Write
+    printf "g\n" # GPT
+    printf "w\n" # Done - Write
 } | fdisk "${disk}"
 
 {
-	printf "n\n" # New Partition
-	printf "\n"  # Default Index (1)
-	printf "\n"  # Default Start Sector (1st available)
-	printf "+${boot_size}\n"
-	
-	printf "t\n" # Change Type
-	printf "\n"  # Default Index (1)
-	printf "1\n" # EFI System Partition
+    printf "n\n" # New Partition
+    printf "\n"  # Default Index (1)
+    printf "\n"  # Default Start Sector (1st available)
+    printf "+%s\n" "${boot_size}"
 
-	printf "n\n" # New Partition
-	printf "\n"  # Default Index (2)
-	printf "\n"  # Default Start Sector (1st available)
-	printf "\n"  # Default End Sector (Last available)
-	
-	printf "t\n" # Change Type
-	printf "\n"  # Default Index (2)
-	printf "31\n" # Linux LVM
+    printf "t\n" # Change Type
+    printf "\n"  # Default Index (1)
+    printf "1\n" # EFI System Partition
 
-	printf "w\n" # Done - Write
+    printf "n\n" # New Partition
+    printf "\n"  # Default Index (2)
+    printf "\n"  # Default Start Sector (1st available)
+    printf "\n"  # Default End Sector (Last available)
+
+    printf "t\n" # Change Type
+    printf "\n"  # Default Index (2)
+    printf "31\n" # Linux LVM
+
+    printf "w\n" # Done - Write
 
 } | fdisk "${disk}"
 
