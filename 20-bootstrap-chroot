@@ -169,6 +169,7 @@ configure_sshd() {
         mkdir -p "${user_ssh_directory}"
         cp private/id_rsa "${user_ssh_directory}/"
         cp private/id_rsa.pub "${user_ssh_directory}/"
+        cp private/id_rsa.pub "${user_ssh_directory}/authorized_keys"
         chown -R "${CONFIG_USER_NAME}:${CONFIG_USER_NAME}" "${user_ssh_directory}"
     fi
 
