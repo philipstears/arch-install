@@ -13,6 +13,7 @@ declare -r CONFIG_SSHD_PORT=${SSHD_PORT}
 declare -r CONFIG_GIT_USER_NAME=${GIT_USER_NAME}
 declare -r CONFIG_GIT_EMAIL=${GIT_EMAIL}
 declare -r CONFIG_POST_BOOTSTRAP_HOOK=${POST_BOOTSTRAP_HOOK:-}
+declare -r CONFIG_CRYPT_PARTITION=${CRYPT_PARTITION}
 
 main() {
     printf "In chroot setup script\n"
@@ -119,7 +120,7 @@ disable_root() {
 setup_systemd_boot() {
     local -r lvm_vg_name=main
     local -r lvm_lv_name=root
-    local -r device_id=$(blkid /dev/nvme0n1p2 --match-tag=UUID --output=value)
+    local -r device_id=$(blkid "${CRYPT_PARTITION}" --match-tag=UUID --output=value)
 
     # make sure we've got some microcode
     pacman -S --noconfirm intel-ucode
