@@ -3,14 +3,16 @@
 set -euo pipefail
 set -x
 
+source "$(dirname "${BASH_SOURCE[0]}")/disk-config"
+
 declare -r esp=${ESP_PARTITION}
 declare -r lvm=${CRYPT_PARTITION}
 declare -r crypt_mapping_name=cryptlvm
 declare -r volume_group_name=main
 
-source "$(dirname "${BASH_SOURCE[0]}")/disk-config"
-
-cryptsetup open "${lvm}" "${crypt_mapping_name}"
+if [[ ! -d "/dev/${volume_group_name}" ]]; then
+    cryptsetup open "${lvm}" "${crypt_mapping_name}"
+fi
 
 # Mount everything!
 mkdir -p /mnt

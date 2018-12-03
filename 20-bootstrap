@@ -46,6 +46,8 @@ setup_system_inside_chroot() {
     cp 20-bootstrap-chroot "${setup_dir}"
     cp system-config "${setup_dir}"          # hostname/username/etc
     cp disk-config "${setup_dir}"            # Needed so we can configure the bootloader properly
+    cp -r sources "${setup_dir}"
+    cp -r hooks "${setup_dir}"
 
     # Private hosts, SSH keys, etc
     if [[ -d private ]]; then

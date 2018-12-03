@@ -17,7 +17,7 @@ declare -r CONFIG_POST_BOOTSTRAP_HOOK=${POST_BOOTSTRAP_HOOK:-}
 main() {
     printf "In chroot setup script\n"
     set_time_zone
-    set_hardware_clock
+    configure_time
     set_locale_info
     configure_host
     setup_initramfs
@@ -31,9 +31,9 @@ main() {
     install_graphical_desktop
 
     if [[ -x "${CONFIG_POST_BOOTSTRAP_HOOK}" ]]; then
-        export CONFIG_HOST_NAME
-        export CONFIG_USER_NAME
-        "./${CONFIG_POST_BOOTSTRAP_HOOK}"
+        USER_NAME=$CONFIG_USER_NAME \
+            HOST_NAME=$CONFIG_HOST_NAME \
+            "./${CONFIG_POST_BOOTSTRAP_HOOK}"
     fi
 }
 
@@ -42,7 +42,10 @@ set_time_zone() {
     ln -sf "/usr/share/zoneinfo/${TZ_REGION}/${TZ_CITY}" /etc/localtime
 }
 
-set_hardware_clock() {
+configure_time() {
+    printf "Enabling NTP\n"
+    timedatectl set-ntp true
+
     printf "Setting hardware clock\n"
     hwclock --systohc
 }
@@ -107,8 +110,10 @@ disable_root() {
     # Remove roots password completely and lock the user
     passwd -dl root
 
-    # And set it's account expiry into the past
-    usermod --expiredate 1 root
+    # NOTE: I disabled this because otherwise you can't sudo usermod afterwards, it complains
+    #       that the root user is disabled, which means you can't edit group memberships
+    # # And set it's account expiry into the past
+    # usermod --expiredate 1 root
 }
 
 setup_systemd_boot() {
@@ -153,7 +158,7 @@ install_base_packages() {
     base_packages+=(git git-lfs vim)
     base_packages+=(openssh)
 
-    pacman -S --noconfirm "${base_packages[@]}"
+    pacman -S --noconfirm --needed "${base_packages[@]}"
 }
 
 configure_sshd() {
@@ -164,9 +169,10 @@ configure_sshd() {
         mkdir -p "${user_ssh_directory}"
         cp private/id_rsa "${user_ssh_directory}/"
         cp private/id_rsa.pub "${user_ssh_directory}/"
+        chown -R "${CONFIG_USER_NAME}:${CONFIG_USER_NAME}" "${user_ssh_directory}"
     fi
 
-    SSHD_PORT=${CONFIG_SSHD_PORT} envsubst < sshd_config-template > /etc/ssh/sshd_config
+    SSHD_PORT=${CONFIG_SSHD_PORT} envsubst < sources/sshd_config-template > /etc/ssh/sshd_config
 
     systemctl enable sshd
 }
@@ -194,7 +200,7 @@ install_graphical_desktop() {
     packages+=(pulseaudio pulseaudio-alsa pavucontrol)
     packages+=(firefox)
 
-    pacman -S --noconfirm "${packages[@]}"
+    pacman -S --noconfirm --needed "${packages[@]}"
 
     systemctl enable lightdm
 }

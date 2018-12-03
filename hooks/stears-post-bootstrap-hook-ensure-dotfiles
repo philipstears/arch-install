@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# NOTE: this script gets run as the target user, not as root
+
+set -euo pipefail
+set -x
+
+declare -r DOT_FILES_REPO=git@github.com:philipstears/dotfiles
+
+main() {
+    mkdir -p "${HOME}/data/me"
+
+    # Make sure we've got access to the SSH key before doing stuff with git
+    eval "$(ssh-agent)"
+    ssh-add
+
+    if [[ -d "${HOME}/data/me/dotfiles" ]]; then
+        ( cd "${HOME}/data/me/dotfiles" && git pull )
+    else
+        git clone -b arch -- "${DOT_FILES_REPO}" "${HOME}/data/me/dotfiles"
+    fi
+}
+
+main "${@}"

@@ -1,70 +1,23 @@
 #!/usr/bin/env bash
+set -euo pipefail
+set -x
+
+# Import the config we need so that we crash early if it isn't there.
+declare -r CONFIG_USER_NAME=${USER_NAME}
+
+declare -r HOOK_DIR=$(readlink --canonicalize --no-newline "$(dirname "${BASH_SOURCE[0]}")")
+declare -r HOME_DIR=$(getent passwd "${CONFIG_USER_NAME}" | cut -d: -f6)
+
+main() {
+    su --login "${CONFIG_USER_NAME}" -c "${HOOK_DIR}/stears-post-bootstrap-hook-ensure-dotfiles"
+    # "${user_home_directory}/data/me/dotfiles/install"
+}
 
 xmonad() {
-	packages+=(dmenu) 	  # For xmonad
-	packages+=(clipmenu) 	# Seems a nice concept
-	packages+=(stack) 	  # For xmonad
-	packages+=(xmonad xmonad-contrib xmonad-utils)
+    packages+=(dmenu) 	  # For xmonad
+    packages+=(clipmenu) 	# Seems a nice concept
+    packages+=(stack) 	  # For xmonad
+    packages+=(xmonad xmonad-contrib xmonad-utils)
 }
 
-additional() {
-	local -a standard_packages=()
-
-	# These are also installed by our bootstrap script, but
-	# this script assumes only a minimal installation in case
-	# it's run atop something more basic
-	standard_packages+=(base-devel)
-	standard_packages+=(linux-tools) # perf
-	standard_packages+=(git git-lfs vim)
-
-	standard_packages+=(rsync)
-	standard_packages+=(terraform)
-	standard_packages+=(tmux)
-	standard_packages+=(ripgrep the_silver_searcher)
-	standard_packages+=(jq)
-	standard_packages+=(curl wget)
-	standard_packages+=(iftop iotop htop)
-	standard_packages+=(unzip)
-	standard_packages+=(strace)
-	standard_packages+=(gnupg)
-	standard_packages+=(aws-cli)
-	standard_packages+=(sl)
-
-	standard_packages+=(docker)
-
-	standard_packages+=(audacity)
-	standard_packages+=(vlc)
-	standard_packages+=(obs-studio)
-
-	standard_packages+=(firefox-developer-edition)
-	standard_packages+=(chromium)
-
-	standard_packages+=(keepass)
-	standard_packages+=(xdotool)
-	standard_packages+=(xsel)
-
-	standard_packages+=(tcpdump)
-	standard_packages+=(wireshark-qt)
-
-	standard_packages+=(neovim)
-	standard_packages+=(ekiga)
-	standard_packages+=(electrum)
-	standard_packages+=(code)
-	standard_packages+=(gimp)
-	standard_packages+=(libreoffice)
-	standard_packages+=(steam steam-native-runtime)
-
-	standard_packages+=(bochs)
-
-	pacman -S --noconfirm "${standard_packages[@]}"
-	# virtualbox
-	# non pacman things:
-	#    chrome
-	#    emacs
-	#    skype (AUR - skypeforlinux-stable-bin)
-	#    spotify (AUR)
-	#    dropbox (AUR)
-}
-
-
-
+main "${@}"
