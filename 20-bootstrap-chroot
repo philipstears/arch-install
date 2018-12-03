@@ -178,8 +178,18 @@ configure_sshd() {
 }
 
 configure_git() {
-    git config --global user.name "${CONFIG_GIT_USER_NAME}"
-    git config --global user.email "${CONFIG_GIT_EMAIL}"
+    local -r user_home_directory=$(getent passwd "${CONFIG_USER_NAME}" | cut -d: -f6)
+    local -r user_git_config=${user_home_directory}/.gitconfig
+
+    {
+        printf "[user]\n"
+        printf "\tname = %s\n" "${CONFIG_GIT_USER_NAME}"
+        printf "\temail = %s\n" "${CONFIG_GIT_EMAIL}"
+        printf "[push]\n"
+        printf "\tdefault = %s\n" "simple"
+    } > "${user_git_config}"
+
+    chown "${CONFIG_USER_NAME}:${CONFIG_USER_NAME}" "${user_git_config}"
 }
 
 install_graphical_desktop() {
