@@ -9,8 +9,11 @@ declare -r HOOK_DIR=$(readlink --canonicalize --no-newline "$(dirname "${BASH_SO
 declare -r HOME_DIR=$(getent passwd "${CONFIG_USER_NAME}" | cut -d: -f6)
 
 main() {
-    su --login "${CONFIG_USER_NAME}" -c "${HOOK_DIR}/stears-post-bootstrap-hook-ensure-dotfiles"
-    # "${user_home_directory}/data/me/dotfiles/install"
+
+    # Configuration that should be run as the user - e.g. getting dotfiles
+    su --login "${CONFIG_USER_NAME}" -c "${HOOK_DIR}/stears-post-bootstrap-hook-as-user"
+
+    # "${HOME_DIR}/data/me/dotfiles/install"
 }
 
 xmonad() {

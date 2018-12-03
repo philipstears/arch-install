@@ -4,7 +4,8 @@
 set -euo pipefail
 set -x
 
-declare -r DOT_FILES_REPO=git@github.com:philipstears/dotfiles
+declare -r DOTFILES_REPO=git@github.com:philipstears/dotfiles
+declare -r PROJECT_REPO=git@github.com:philipstears/project
 
 main() {
     mkdir -p "${HOME}/data/me"
@@ -16,7 +17,13 @@ main() {
     if [[ -d "${HOME}/data/me/dotfiles" ]]; then
         ( cd "${HOME}/data/me/dotfiles" && git pull )
     else
-        git clone -b arch -- "${DOT_FILES_REPO}" "${HOME}/data/me/dotfiles"
+        git clone -b arch -- "${DOTFILES_REPO}" "${HOME}/data/me/dotfiles"
+    fi
+
+    if [[ -d "${HOME}/data/me/project" ]]; then
+        ( cd "${HOME}/data/me/project" && git pull )
+    else
+        git clone "${PROJECT_REPO}" "${HOME}/data/me/project"
     fi
 }
 
