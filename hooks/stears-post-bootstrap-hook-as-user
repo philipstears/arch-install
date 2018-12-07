@@ -25,6 +25,8 @@ main() {
     else
         git clone "${PROJECT_REPO}" "${HOME}/data/me/project"
     fi
+
+    ln -sf "${HOME}/data/me/project/project" "${HOME}/.local/bin/project"
 }
 
 main "${@}"
