@@ -158,6 +158,7 @@ install_base_packages() {
     base_packages+=(linux-tools) # perf
     base_packages+=(git git-lfs vim)
     base_packages+=(openssh)
+    base_packages+=(netctl dialog wpa_supplicant) # netctl has wifi-menu - dialog and wpa_supplicant are needed for wifi
 
     pacman -S --noconfirm --needed "${base_packages[@]}"
 }
